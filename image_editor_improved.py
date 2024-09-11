@@ -13,6 +13,7 @@ main_window.resize(900, 700)
 btn_folder = QPushButton("Select Folder")
 file_list = QListWidget()
 
+original = QPushButton("Original")
 btn_left = QPushButton("Left")
 btn_right = QPushButton("Right")
 mirror = QPushButton("Mirror")
@@ -21,6 +22,9 @@ gray = QPushButton("Gray")
 saturation = QPushButton("Saturation")
 contrast = QPushButton("Contrast")
 blur = QPushButton("Blur")
+
+undo = QPushButton("Undo")
+redo = QPushButton("Redo")
 
 # ========= Dropdown box =============
 filter_box = QComboBox()
@@ -47,6 +51,7 @@ col1.addWidget(btn_folder)
 col1.addWidget(file_list)
 col1.addWidget(filter_box)
 
+col1.addWidget(original)
 col1.addWidget(btn_left)
 col1.addWidget(btn_right)
 col1.addWidget(mirror)
@@ -55,6 +60,11 @@ col1.addWidget(gray)
 col1.addWidget(saturation)
 col1.addWidget(contrast)
 col1.addWidget(blur)
+
+row = QHBoxLayout()
+row.addWidget(undo)
+row.addWidget(redo)
+col1.addLayout(row)
 
 # col 2 
 col2.addWidget(picture_box)
@@ -116,6 +126,9 @@ class Editor():
         self.filename = None
         self.save_folder = "edits/"
         
+        self.undo_stack = []
+        self.redo_stack = []
+        
         self.editor_functions = {
                 "Left": lambda image : image.transpose(Image.ROTATE_90),
                 "Right": lambda image : image.transpose(Image.ROTATE_270),
@@ -153,13 +166,13 @@ class Editor():
         transformations = self.editor_functions
         transform_function = transformations.get(transformation)
         
-        if transform_function:
-            self.image = transform_function(self.image)
-            self.save_image()
-            
+        self.undo_stack.append((self.image, self.filename))
+        self.image = transform_function(self.image)
+        
         self.save_image()
-        image_path = os.path.join(working_directory,self.save_folder,self.filename)
+        image_path = os.path.join(working_directory, self.save_folder, self.filename)
         self.show_image(image_path)
+        # print(self.undo_stack)
         
     def apply_filter(self,filter_name):
         if filter_name == "Original":
@@ -176,6 +189,27 @@ class Editor():
         self.save_image()
         image_path = os.path.join(working_directory,self.save_folder,self.filename)
         self.show_image(image_path)
+        
+    def undo(self):
+        if self.undo_stack:
+            image, filename = self.undo_stack.pop()
+            # print(image, filename)
+            self.image = image
+            self.filename = filename
+            self.redo_stack.append((self.image, self.filename))
+            self.save_image()
+            image_path = os.path.join(working_directory, self.save_folder, self.filename)
+            self.show_image(image_path)
+
+    def redo(self):
+        if self.redo_stack:
+            image, filename = self.redo_stack.pop()
+            self.image = image
+            self.filename = filename
+            self.undo_stack.append((self.image, self.filename))
+            self.save_image()
+            image_path = os.path.join(working_directory, self.save_folder, self.filename)
+            self.show_image(image_path)
 
 def handle_filter():
     if file_list.currentRow() >= 0 :
@@ -195,6 +229,7 @@ btn_folder.clicked.connect(getWorkDirectory)
 file_list.currentRowChanged.connect(displayImage)
 filter_box.currentTextChanged.connect(handle_filter)
 
+original.clicked.connect(lambda: editor.apply_filter("Original"))
 btn_left.clicked.connect(lambda: editor.transformImage("Left"))
 btn_right.clicked.connect(lambda: editor.transformImage("Right"))
 mirror.clicked.connect(lambda: editor.transformImage("Mirror"))
@@ -202,6 +237,9 @@ sharpness.clicked.connect(lambda: editor.transformImage("Sharpness"))
 gray.clicked.connect(lambda: editor.transformImage("Gray"))
 contrast.clicked.connect(lambda: editor.transformImage("Contrast"))
 blur.clicked.connect(lambda: editor.transformImage("Blur"))
+
+undo.clicked.connect(editor.undo)
+redo.clicked.connect(editor.redo)
 
 main_window.show()
 app.exec_()
